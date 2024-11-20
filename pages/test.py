@@ -8,22 +8,18 @@ import plotly.express as px
 from streamlit_extras.stylable_container import stylable_container
 
 
-# Now you can use stylable_container like this:
-with stylable_container(
-    key="test_container",
-    css_styles="""
-        button {
-            background-color: red;
-            color: white;
-            border-radius: 5px;
-            padding: 10px 20px;
-        }
-        button:hover {
-            background-color: darkred;
-            color: white;
-        }
-    """,
-):
-    if st.button("Click me!", key="test_button"):
-        st.write("Button clicked")
+import requests
+
+# Test the API endpoint
+url = "https://smard.api.proxy.bund.dev/app/chart_data/1223/DE/1223_DE_hour_5.json"
+response = requests.get(url)
+
+print(f"Status Code: {response.status_code}")
+if response.status_code == 200:
+    print("API is working!")
+    data = response.json()
+    print("\nFirst few items of data:")
+    print(data)
+else:
+    print(f"API error: {response.status_code}")
 

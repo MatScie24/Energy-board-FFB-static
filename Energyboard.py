@@ -1,5 +1,5 @@
-import time  # to simulate a real time data, time loop
-from datetime import datetime
+import time
+from datetime import datetime, timedelta
 import streamlit as st
 import pydeck as pdk
 import pandas as pd
@@ -7,10 +7,8 @@ import numpy as np
 import plotly.express as px
 from streamlit_extras.stylable_container import stylable_container
 import random
-
-# Add this near the top of your file to define the windmill icon
-ICON_URL = "https://raw.githubusercontent.com/uber/deck.gl/master/examples/layer-browser/data/icon-atlas.png"
-ICON_MAPPING = {"windmill": {"x": 0, "y": 0, "width": 128, "height": 128, "mask": True}}
+import requests
+import matplotlib.pyplot as plt
 
 # Initialize session state variables
 for i in range(4):
@@ -22,53 +20,115 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-
-
-
-# read csv from a github repo
-url = 'https://raw.githubusercontent.com/MatScie24/blank-app/refs/heads/main/Book1.csv'
-
-# read csv from a URL
-@st.cache_data
-def get_data() -> pd.DataFrame:
-    return pd.read_csv(url)
-
-df = get_data()
-# Create an empty placeholder
+# Create an empty placeholder for live data
 placeholder = st.empty()
 
-# near real-time / live feed simulation
-for seconds in range(200):
-    df["Halloeins_new"] = df["Halloeins"] * np.random.choice(range(1, 5))
-    df["Hallozwei_new"] = df["Hallozwei"] * np.random.choice(range(1, 5))
-    df["Hallodrei_new"] = df["Hallodrei"] * np.random.choice(range(1, 5))
+@st.cache_data(ttl=300)  # Cache for 5 minutes
+def fetch_live_data():
+    try:
+        # SMARD API endpoints
+        base_url = "https://smard.api.proxy.bund.dev/app/chart_data/1223/DE/1223_DE_hour_1.json"
+        
+        # Get timestamps for the last 24 hours
+        end_time = int(datetime.now().replace(minute=0, second=0, microsecond=0).timestamp() * 1000)
+        start_time = int((datetime.now().replace(minute=0, second=0, microsecond=0) - timedelta(hours=24)).timestamp() * 1000)
+        
+        # Filter IDs for different types of data:
+        # 4359 = Solar (Actual Generation)
+        # 4066 = Gas (Natural Gas Consumption)
+        # 122 = Total Load (Consumption)
+        
+        # Debug print
+        st.write(f"Fetching data from {start_time} to {end_time}")
+        
+        # Fetch solar generation
+        solar_url = f"{base_url}/4359/DE/DE/{start_time}/{end_time}"
+        solar_response = requests.get(solar_url)
+        if solar_response.status_code != 200:
+            st.error(f"Solar API Error: Status {solar_response.status_code}")
+            st.write(f"Solar URL: {solar_url}")
+            return None
+        solar_data = solar_response.json()
+        
+        # Fetch gas consumption
+        gas_url = f"{base_url}/4066/DE/DE/{start_time}/{end_time}"
+        gas_response = requests.get(gas_url)
+        if gas_response.status_code != 200:
+            st.error(f"Gas API Error: Status {gas_response.status_code}")
+            st.write(f"Gas URL: {gas_url}")
+            return None
+        gas_data = gas_response.json()
+        
+        # Fetch total load
+        load_url = f"{base_url}/122/DE/DE/{start_time}/{end_time}"
+        load_response = requests.get(load_url)
+        if load_response.status_code != 200:
+            st.error(f"Load API Error: Status {load_response.status_code}")
+            st.write(f"Load URL: {load_url}")
+            return None
+        load_data = load_response.json()
+        
+        # Debug prints
+        st.write("Solar Data:", solar_data)
+        st.write("Gas Data:", gas_data)
+        st.write("Load Data:", load_data)
+        
+        # Get the most recent values
+        latest_solar = solar_data['series'][-1]['value'] if 'series' in solar_data else 0
+        latest_gas = gas_data['series'][-1]['value'] if 'series' in gas_data else 0
+        latest_load = load_data['series'][-1]['value'] if 'series' in load_data else 0
+        
+        # Convert to appropriate scale (values are in MW, convert to kW)
+        return {
+            'hiltrup_power': latest_load / 1000,
+            'prefab_power': latest_load / 2000,
+            'pv_roof_power': latest_solar / 1000,
+            'hiltrup_gas': latest_gas / 1000,
+            'prefab_gas': latest_gas / 2000,
+            'pv_ppa_power': latest_solar / 1500
+        }
+    except Exception as e:
+        st.error(f"Error fetching data: {str(e)}")
+        st.write("Full error:", e)
+        # Return default values
+        return {
+            'hiltrup_power': 0,
+            'prefab_power': 0,
+            'pv_roof_power': 0,
+            'hiltrup_gas': 0,
+            'prefab_gas': 0,
+            'pv_ppa_power': 0
+        }
 
-    # creating KPIs
-    avg_halloeins = np.mean(df["Halloeins_new"])
-    avg_hallozwei = np.mean(df["Hallozwei_new"])
-    avg_hallodrei = np.mean(df["Hallodrei_new"])
-
+# Live data update loop
+while True:
+    live_data = fetch_live_data()
+    
+    if live_data is None:
+        st.error("Failed to fetch data, retrying in 5 minutes...")
+        time.sleep(300)
+        continue
+        
     with placeholder.container():
-        # create a single column
+        # First row of KPIs
         kpi1, kpi2, kpi3 = st.columns(3)
         
-        # fill in the column with the metric or KPI
         kpi1.metric(
-            label="Energieverbrauch in",
-            value=round(avg_halloeins),
-            delta=round(avg_halloeins) - 10,
+            label="Stromverbrauch Hiltrup",
+            value=f"{round(live_data['hiltrup_power'])}kWh",
+            delta=round(live_data['hiltrup_power'] - 10),
         )
 
         kpi2.metric(
-            label="CO2 equivalent",
-            value=round(avg_hallozwei),
-            delta=round(avg_hallozwei) - 10,
+            label="Stromverbrauch Pre-Fab",
+            value=f"{round(live_data['prefab_power'])}kWh",
+            delta=round(live_data['prefab_power'] - 10),
         )
 
         kpi3.metric(
-            label="Kosten",
-            value=round(avg_hallodrei),
-            delta=round(avg_hallodrei) - 10,
+            label="PV Dach Strom",
+            value=f"{round(live_data['pv_roof_power'])}kWh",
+            delta=round(live_data['pv_roof_power'] - 10),
         )
 
         # Add a small space between rows
@@ -77,25 +137,25 @@ for seconds in range(200):
         # Second row of KPIs
         kpi4, kpi5, kpi6 = st.columns(3)
         
-        # fill in the second row with new metrics
         kpi4.metric(
-            label="Energieeffizienz",
-            value=f"{round(avg_halloeins/2)}%",  # Example calculation
-            delta=round(avg_halloeins/2) - 5,
+            label="Gasverbrauch Hiltrup",
+            value=f"{round(live_data['hiltrup_gas'])}kWh",
+            delta=round(live_data['hiltrup_gas'] - 5),
         )
 
         kpi5.metric(
-            label="Renewable Share",
-            value=f"{round(avg_hallozwei/3)}%",  # Example calculation
-            delta=round(avg_hallozwei/3) - 5,
+            label="Gasverbrauch Pre-Fab",
+            value=f"{round(live_data['prefab_gas'])}kWh",
+            delta=round(live_data['prefab_gas'] - 5),
         )
 
         kpi6.metric(
-            label="Energy Savings",
-            value=f"{round(avg_hallodrei/4)} kWh",  # Example calculation
-            delta=round(avg_hallodrei/4) - 5,
+            label="PV PPA Strom",
+            value=f"{round(live_data['pv_ppa_power'])}kWh",
+            delta=round(live_data['pv_ppa_power'] - 5),
         )
-        #time.sleep(1)
+
+        time.sleep(300)  # Update every 5 minutes
 
 st.markdown("---")  # Add a separator
 
@@ -110,10 +170,10 @@ with left_col:
         'name': ['Solar Plant', 'Hiltrup', 'Pre Fab', 'Fab'],
         'icon_type': ['circle', 'circle', 'circle', 'circle'],
         'color': [
-            [0, 42, 59],     # #002a3b (Dark blue) for Solar
-            [57, 193, 205],  # #39c1cd (Light blue) for Wind
-            [28, 149, 163],  # #1c95a3 (Medium-light blue) for Biomass
-            [13, 95, 111]    # #0d5f6f (Medium-dark blue) for Hydro
+            [0, 42, 59],     # Dark blue for Solar
+            [57, 193, 205],  # Light blue for Wind
+            [28, 149, 163],  # Medium-light blue for Biomass
+            [13, 95, 111]    # Medium-dark blue for Hydro
         ]
     })
 
@@ -123,7 +183,6 @@ with left_col:
         zoom=12
     )
 
-    # Create a single ScatterplotLayer for all markers
     layer = pdk.Layer(
         'ScatterplotLayer',
         markers_data,
@@ -146,8 +205,6 @@ with left_col:
     )
 
     st.pydeck_chart(deck)
-
-
 
 # Replace the button section in the right column with this:
 with right_col:
