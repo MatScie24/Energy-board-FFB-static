@@ -54,20 +54,20 @@ for seconds in range(200):
         
         # fill in the column with the metric or KPI
         kpi1.metric(
-            label="Energieverbrauch in",
-            value=round(avg_halloeins),
+            label="Stromverbrauch Hiltrup",
+            value=f"{round(avg_halloeins/3)}kWh",
             delta=round(avg_halloeins) - 10,
         )
 
         kpi2.metric(
-            label="CO2 equivalent",
-            value=round(avg_hallozwei),
+            label="Stromverbrauch Pre-Fab",
+            value=f" {round (avg_hallozwei)}kWh",
             delta=round(avg_hallozwei) - 10,
         )
 
         kpi3.metric(
-            label="Kosten",
-            value=round(avg_hallodrei),
+            label="PV Dach Strom",
+            value=f" {round (avg_hallodrei)}kWh",
             delta=round(avg_hallodrei) - 10,
         )
 
@@ -79,23 +79,23 @@ for seconds in range(200):
         
         # fill in the second row with new metrics
         kpi4.metric(
-            label="Energieeffizienz",
-            value=f"{round(avg_halloeins/2)}%",  # Example calculation
+            label="Gasverbrauch Hiltrup",
+            value=f"{round(avg_halloeins/3)}kWh",  # Example calculation
             delta=round(avg_halloeins/2) - 5,
         )
 
         kpi5.metric(
-            label="Renewable Share",
-            value=f"{round(avg_hallozwei/3)}%",  # Example calculation
+            label="Gasverbrauch Pre-Fab",
+            value=f"{round(avg_hallozwei/3)}kWh",  # Example calculation
             delta=round(avg_hallozwei/3) - 5,
         )
 
         kpi6.metric(
-            label="Energy Savings",
+            label="PV PPA Strom",
             value=f"{round(avg_hallodrei/4)} kWh",  # Example calculation
             delta=round(avg_hallodrei/4) - 5,
         )
-        #time.sleep(1)
+        #time.sleep(5)
 
 st.markdown("---")  # Add a separator
 
