@@ -4,8 +4,4 @@ numpy==1.21.2
 pydeck==0.7.1
 plotly==5.1.0
 streamlit-extras==0.1.0  # Adjust this based on the actual version you are using
-<<<<<<< HEAD
 matplotlib==3.4.3
-=======
-matplotlib==3.4.3
->>>>>>> d98cd48e46c041d828341dd3272fe6a1437896c0
