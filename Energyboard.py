@@ -8,9 +8,6 @@ import plotly.express as px
 from streamlit_extras.stylable_container import stylable_container
 import random
 
-# Add this near the top of your file to define the windmill icon
-ICON_URL = "https://raw.githubusercontent.com/uber/deck.gl/master/examples/layer-browser/data/icon-atlas.png"
-ICON_MAPPING = {"windmill": {"x": 0, "y": 0, "width": 128, "height": 128, "mask": True}}
 
 # Initialize session state variables
 for i in range(4):

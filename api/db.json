@@ -1,0 +1,23 @@
+{
+  "energy_data": [
+    {
+      "id": "1",
+      "timestamp": "2024-01-01T00:00:00",
+      "Halloeins": 100,
+      "Hallozwei": 90,
+      "Hallodrei": 80
+    },
+    {
+      "id": "2",
+      "timestamp": "2024-01-01T01:00:00",
+      "Halloeins": 95,
+      "Hallozwei": 85,
+      "Hallodrei": 75
+    }
+  ],
+  "latest_readings": {
+    "Halloeins": 104.70383272532855,
+    "Hallozwei": 110.98187649448934,
+    "Hallodrei": 97.32518409048826
+  }
+}
