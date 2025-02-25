@@ -8,6 +8,11 @@ import plotly.express as px
 from streamlit_extras.stylable_container import stylable_container
 import random
 
+# Configuration for file paths
+EXCEL_PATHS = {
+    'energy': 'E_H.xlsx',  # Current path in repository
+    'other': 'E_P.xlsx'  # Add your second Excel file name here
+}
 
 # Initialize session state variables
 for i in range(4):
@@ -19,80 +24,117 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+# Add this near the top of your app
+if st.button('🔄 Refresh Data'):
+    st.cache_data.clear()
+    st.rerun()
 
+# Modify the cache decorator to expire after a short time
+@st.cache_data(ttl=5)  # Cache expires after 5 seconds
+def load_excel_data():
+    """Load and process data from Excel files"""
+    try:
+        # Load energy data from Hiltrup Excel file
+        df_hiltrup = pd.read_excel(
+            EXCEL_PATHS['energy'], 
+            sheet_name='Fest', 
+            skiprows=2
+        )
+        
+        # Load energy data from Pre-Fab Excel file
+        df_prefab = pd.read_excel(
+            EXCEL_PATHS['other'], 
+            sheet_name='Fest', 
+            skiprows=2
+        )
+        
+        # Get last non-NaN values for each column
+        column_d = df_hiltrup.iloc[:, 3]  # Column D (Hiltrup Energy)
+        column_l = df_hiltrup.iloc[:, 11]  # Column L (Hiltrup Gas)
+        column_e = df_prefab.iloc[:, 4]  # Column E (Pre-Fab Energy)
+        
+        hiltrup_energy = column_d.dropna().iloc[-1]  # Last non-NaN value
+        hiltrup_gas = column_l.dropna().iloc[-1]  # Last non-NaN value
+        prefab_energy = column_e.dropna().iloc[-1]  # Last non-NaN value
+        
+        # Prepare for future Pre-Fab gas data (Column N will be index 13)
+        try:
+            column_n = df_prefab.iloc[:, 13]  # Column N (Pre-Fab Gas)
+            prefab_gas = column_n.dropna().iloc[-1]  # Last non-NaN value
+        except:
+            prefab_gas = 0  # Default to 0 if data not yet available
+        
+        return {
+            'hiltrup_energy': hiltrup_energy,
+            'prefab_energy': prefab_energy,
+            'hiltrup_gas': hiltrup_gas,
+            'prefab_gas': prefab_gas
+        }
+    except Exception as e:
+        st.error(f"Error loading Excel files: {str(e)}")
+        return {
+            'hiltrup_energy': 0,
+            'prefab_energy': 0,
+            'hiltrup_gas': 0,
+            'prefab_gas': 0
+        }
 
+# Load the data
+data = load_excel_data()
 
-# read csv from a github repo
-url = 'https://raw.githubusercontent.com/MatScie24/blank-app/refs/heads/main/Book1.csv'
-
-# read csv from a URL
-@st.cache_data
-def get_data() -> pd.DataFrame:
-    return pd.read_csv(url)
-
-df = get_data()
 # Create an empty placeholder
 placeholder = st.empty()
 
-# near real-time / live feed simulation
-for seconds in range(200):
-    df["Halloeins_new"] = df["Halloeins"] * np.random.choice(range(1, 5))
-    df["Hallozwei_new"] = df["Hallozwei"] * np.random.choice(range(1, 5))
-    df["Hallodrei_new"] = df["Hallodrei"] * np.random.choice(range(1, 5))
+with placeholder.container():
+    # Create KPI columns
+    kpi1, kpi2, kpi3 = st.columns(3)
+    
+    # Update the Hiltrup metric with actual data from Excel
+    kpi1.metric(
+        label="Stromverbrauch Hiltrup",
+        value=f"{round(data['hiltrup_energy'])}kWh",
+        delta=None  # Remove delta for now, or calculate it based on historical data if needed
+    )
 
-    # creating KPIs
-    avg_halloeins = np.mean(df["Halloeins_new"])
-    avg_hallozwei = np.mean(df["Hallozwei_new"])
-    avg_hallodrei = np.mean(df["Hallodrei_new"])
+    # Update the Pre-Fab metric with actual data from Excel
+    kpi2.metric(
+        label="Stromverbrauch Pre-Fab",
+        value=f"{round(data['prefab_energy'])}kWh",
+        delta=None  # Remove delta for now, or calculate it based on historical data if needed
+    )
 
-    with placeholder.container():
-        # create a single column
-        kpi1, kpi2, kpi3 = st.columns(3)
-        
-        # fill in the column with the metric or KPI
-        kpi1.metric(
-            label="Stromverbrauch Hiltrup",
-            value=f"{round(avg_halloeins/3)}kWh",
-            delta=round(avg_halloeins) - 10,
-        )
+    # For now, keeping PV Dach Strom as placeholder
+    kpi3.metric(
+        label="PV Dach Strom",
+        value="0 kWh",  # Replace with actual data when available
+        delta=None
+    )
 
-        kpi2.metric(
-            label="Stromverbrauch Pre-Fab",
-            value=f" {round (avg_hallozwei)}kWh",
-            delta=round(avg_hallozwei) - 10,
-        )
+    # Add a small space between rows
+    st.markdown("<br>", unsafe_allow_html=True)
 
-        kpi3.metric(
-            label="PV Dach Strom",
-            value=f" {round (avg_hallodrei)}kWh",
-            delta=round(avg_hallodrei) - 10,
-        )
+    # Second row of KPIs
+    kpi4, kpi5, kpi6 = st.columns(3)
+    
+    # Update second row metrics with actual data
+    kpi4.metric(
+        label="Gasverbrauch Hiltrup",
+        value=f"{round(data['hiltrup_gas'])}kWh",  # Now using actual gas consumption data
+        delta=None
+    )
 
-        # Add a small space between rows
-        st.markdown("<br>", unsafe_allow_html=True)
+    kpi5.metric(
+        label="Gasverbrauch Pre-Fab",
+        value=f"{round(data['prefab_gas'])}kWh",  # Will show 0 until data is available
+        delta=None
+    )
 
-        # Second row of KPIs
-        kpi4, kpi5, kpi6 = st.columns(3)
-        
-        # fill in the second row with new metrics
-        kpi4.metric(
-            label="Gasverbrauch Hiltrup",
-            value=f"{round(avg_halloeins/3)}kWh",  # Example calculation
-            delta=round(avg_halloeins/2) - 5,
-        )
-
-        kpi5.metric(
-            label="Gasverbrauch Pre-Fab",
-            value=f"{round(avg_hallozwei/3)}kWh",  # Example calculation
-            delta=round(avg_hallozwei/3) - 5,
-        )
-
-        kpi6.metric(
-            label="PV PPA Strom",
-            value=f"{round(avg_hallodrei/4)} kWh",  # Example calculation
-            delta=round(avg_hallodrei/4) - 5,
-        )
-        #time.sleep(5)
+    kpi6.metric(
+        label="PV PPA Strom",
+        value="0 kWh",  # Replace with actual data when available
+        delta=None
+    )
+    #time.sleep(5)
 
 st.markdown("---")  # Add a separator
 
@@ -102,23 +144,47 @@ left_col, right_col = st.columns([2, 1])  # 2:1 ratio
 with left_col:
     # Create markers data for different locations in Münster
     markers_data = pd.DataFrame({
-        'lat': [51.9375, 51.9475, 51.9275, 51.9325],
-        'lon': [7.6257, 7.6357, 7.6157, 7.6307],
-        'name': ['Solar Plant', 'Hiltrup', 'Pre Fab', 'Fab'],
-        'icon_type': ['circle', 'circle', 'circle', 'circle'],
+        'lat': [
+            51.90420411948579,  # Hiltrup
+            51.88415475117976,  # Pre Fab
+            51.881361014123534,  # Fab
+            51.87670010770188,   # Solar Plant (1st point)
+            51.87183001556695,   # Solar Plant (2nd point)
+            51.87157930783964    # Solar Plant (3rd point)
+        ],
+        'lon': [
+            7.653420120874677,   # Hiltrup
+            7.5811485841790285,  # Pre Fab
+            7.577477778349916,   # Fab
+            7.578040913354053,   # Solar Plant (1st point)
+            7.577768505780002,   # Solar Plant (2nd point)
+            7.580829529041081    # Solar Plant (3rd point)
+        ],
+        'name': [
+            'Hiltrup', 
+            'Pre Fab', 
+            'Fab', 
+            'Solar Plant 1', 
+            'Solar Plant 2', 
+            'Solar Plant 3'
+        ],
+        'icon_type': ['circle'] * 6,
         'color': [
-            [0, 42, 59],     # #002a3b (Dark blue) for Solar
-            [57, 193, 205],  # #39c1cd (Light blue) for Wind
-            [28, 149, 163],  # #1c95a3 (Medium-light blue) for Biomass
-            [13, 95, 111]    # #0d5f6f (Medium-dark blue) for Hydro
+            [57, 193, 205],  # #39c1cd (Light blue) for Hiltrup
+            [28, 149, 163],  # #1c95a3 (Medium-light blue) for Pre Fab
+            [13, 95, 111],    # #0d5f6f (Medium-dark blue) for Fab
+            [0, 42, 59],     # #002a3b (Dark blue) for Solar Plant
+            [0, 42, 59],     # #002a3b (Dark blue) for Solar Plant
+            [0, 42, 59]      # #002a3b (Dark blue) for Solar Plant
         ]
     })
 
     view_state = pdk.ViewState(
-        latitude=51.9375,
-        longitude=7.6257,
-        zoom=12
-    )
+    latitude=51.88916099819016,  # New starting latitude for Hiltrup
+    longitude=7.6051777337444815,  # New starting longitude for Hiltrup
+    zoom=12                       # Adjust zoom level as needed
+)
+
 
     # Create a single ScatterplotLayer for all markers
     layer = pdk.Layer(
